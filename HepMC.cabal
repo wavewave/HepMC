@@ -1,0 +1,21 @@
+name:                HepMC
+version:             0.0
+synopsis:            Haskell HepMC parser and builder
+description:         Haskell HepMC parser and builder
+homepage:            http://github.com/wavewave/HepMC
+license:             GPL-3
+license-file:        LICENSE
+author:              Ian-Woo Kim
+maintainer:          ianwookim@gmail.com
+category:            Physics
+build-type:          Simple
+cabal-version:       >=1.8
+
+Library
+  hs-source-dirs: src
+  ghc-options: 	-Wall -Werror -funbox-strict-fields -fno-warn-unused-do-bind -fno-warn-orphans
+  ghc-prof-options: -caf-all -auto-all
+  Build-Depends:   base == 4.*
+  Exposed-Modules: HEP.Parser.HepMC
+  Other-Modules: 
+
