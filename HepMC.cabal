@@ -20,6 +20,7 @@ executable tester
                     base == 4.*,
                     pipes,
                     pipes-attoparsec,
+                    pipes-parse,
                     pipes-text,
                     text,
                     transformers,

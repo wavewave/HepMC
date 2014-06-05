@@ -10,19 +10,23 @@ import Data.Text hiding (takeWhile, length)
 -- 
 import Prelude hiding (takeWhile)
 
-hepmc :: Parser (Text,[(Text,[Int])])
-hepmc = do 
+hepmcHeader :: Parser Version
+hepmcHeader = do 
     skipSpace 
     ver <- hepmcVersion 
     skipSpace
     blockStart
     skipSpace
-    xs <- replicateM 3 event --  many1 event
+    return ver
+
+    -- xs <- replicateM 3 event
+    -- xs <- many1 event
     -- e <- lineE 
     -- lineN >> lineU >> lineC >> lineF
     -- ns <- many1 vertexParticles 
-    return (ver,xs)
+    -- return (ver,length xs)
 
+  
 event :: Parser (Text,[Int])
 event = do 
     e <- lineE 
