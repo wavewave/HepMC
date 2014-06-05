@@ -33,7 +33,7 @@ main = do
   withFile filename ReadMode $ \hin -> 
     runEffect $ do
       (r1,s) <- lift (runStateT p (PIO.fromHandle hin))
-      forever (action s) >-> Pipes.Prelude.tee (counter 100 0 >-> forever (await >> return ())) 
+      action s >-> Pipes.Prelude.tee (counter 100 0 >-> forever (await >> return ())) 
         >-> takeWait 500 >-> counter 70 0 >-> (replicateM 3 printer >> forever (await >> return ())) -- printer
   return ()
 
