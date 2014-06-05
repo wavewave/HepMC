@@ -1,6 +1,19 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module HEP.Parser.HepMC where
 
-type Version = String
+import Data.Attoparsec.Text
+import Data.Text
+-- 
+
+
+hepmc :: Parser Text
+hepmc = skipSpace >> string "HepMC::Version"
+ 
+-- return "hepmc parser test IWKIM" 
+
+
+type Version = Text
 
 data EventBlock = EventBlock Version [ Event ]
 
@@ -50,7 +63,7 @@ data EventHeader = EventHeader { weightInfo :: NamedWeight
                  deriving (Show)
             
 data NamedWeight = NamedWeight { numEntries :: Int
-                               , weightNames :: [ String ] 
+                               , weightNames :: [ Text ] 
                                }
                  deriving (Show)
 
