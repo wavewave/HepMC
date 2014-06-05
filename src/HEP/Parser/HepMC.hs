@@ -2,14 +2,71 @@
 
 module HEP.Parser.HepMC where
 
+import Control.Applicative ((<*), (*>))
+import Control.Monad (replicateM)
+import Data.Char (isSpace)
 import Data.Attoparsec.Text
-import Data.Text
+import Data.Text hiding (takeWhile, length)
 -- 
+import Prelude hiding (takeWhile)
+
+hepmc :: Parser (Text,[(Text,[Int])])
+hepmc = do 
+    skipSpace 
+    ver <- hepmcVersion 
+    skipSpace
+    blockStart
+    skipSpace
+    xs <- replicateM 3 event --  many1 event
+    -- e <- lineE 
+    -- lineN >> lineU >> lineC >> lineF
+    -- ns <- many1 vertexParticles 
+    return (ver,xs)
+
+event :: Parser (Text,[Int])
+event = do 
+    e <- lineE 
+    lineN >> lineU >> lineC >> lineF
+    ns <- many1 vertexParticles 
+    return (e,ns)
+
+vertexParticles  :: Parser Int
+vertexParticles  = do 
+    lineV 
+    ps <- many1 lineP
+    return (length ps)
+
+    
+hepmcVersion :: Parser Version 
+hepmcVersion = string "HepMC::Version" >> skipSpace >> takeWhile (not . isSpace)  
+
+blockStart :: Parser ()
+blockStart = string "HepMC::IO_GenEvent-START_EVENT_LISTING" >> return ()
+
+lineE :: Parser Text
+lineE = char 'E' *> takeWhile (not . isEndOfLine) <* endOfLine
+
+lineN :: Parser Text
+lineN = char 'N' *> takeWhile (not . isEndOfLine) <* endOfLine
+
+lineU :: Parser Text
+lineU = char 'U' *> takeWhile (not . isEndOfLine) <* endOfLine
+
+lineC :: Parser Text
+lineC = char 'C' *> takeWhile (not . isEndOfLine) <* endOfLine
+
+lineF :: Parser Text
+lineF = char 'F' *> takeWhile (not . isEndOfLine) <* endOfLine
+
+lineV :: Parser Text
+lineV = char 'V' *> takeWhile (not . isEndOfLine) <* endOfLine
+
+lineP :: Parser Text
+lineP = char 'P' *> takeWhile (not . isEndOfLine) <* endOfLine
 
 
-hepmc :: Parser Text
-hepmc = skipSpace >> string "HepMC::Version"
- 
+
+
 -- return "hepmc parser test IWKIM" 
 
 
