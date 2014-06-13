@@ -2,7 +2,7 @@
 
 module HEP.Parser.HepMC where
 
-import Control.Applicative ((<*), (*>))
+import Control.Applicative
 import Control.Monad (replicateM)
 import Data.Char (isSpace)
 import Data.Attoparsec.Text
@@ -19,20 +19,15 @@ hepmcHeader = do
     skipSpace
     return ver
 
-    -- xs <- replicateM 3 event
-    -- xs <- many1 event
-    -- e <- lineE 
-    -- lineN >> lineU >> lineC >> lineF
-    -- ns <- many1 vertexParticles 
-    -- return (ver,length xs)
-
   
-event :: Parser (Text,[Int])
+event :: Parser (GenEvent,NamedWeight,MomentumPositionUnit,[Int])
 event = do 
-    e <- lineE 
-    lineN >> lineU >> lineC >> lineF
+    e <- lineE
+    n <- lineN
+    u <- lineU 
+    lineC >> lineF
     ns <- many1 vertexParticles 
-    return (e,ns)
+    return (e,n,u,ns)
 
 vertexParticles  :: Parser Int
 vertexParticles  = do 
@@ -47,14 +42,74 @@ hepmcVersion = string "HepMC::Version" >> skipSpace >> takeWhile (not . isSpace)
 blockStart :: Parser ()
 blockStart = string "HepMC::IO_GenEvent-START_EVENT_LISTING" >> return ()
 
-lineE :: Parser Text
-lineE = char 'E' *> takeWhile (not . isEndOfLine) <* endOfLine
+lineE :: Parser GenEvent
+lineE = do char 'E' 
+           skipSpace 
+           evnum <- decimal
+           skipSpace
+           nmint <- signed decimal
+           skipSpace
+           esc <- double
+           skipSpace
+           aqcd <- double
+           skipSpace
+           aqed <- double
+           skipSpace
+           sid <- decimal
+           skipSpace
+           bcd <- signed decimal
+           skipSpace
+           nvtx <- decimal
+           skipSpace
+           bcdbm1 <- decimal
+           skipSpace
+           bcdbm2 <- decimal
+           skipSpace
+           randomstnum <- decimal
+           skipSpace
+           randomstlst <- replicateM randomstnum decimal
+           skipSpace
+           wgtnum <- decimal
+           skipSpace
+           wgtlst <- replicateM wgtnum double 
+           -- skipSpace
+           skipWhile (not . isEndOfLine )
+           endOfLine
+           return GenEvent { eventNumber = evnum
+                           , numMultiparticleInteractions = nmint 
+                           , eventScale = esc
+                           , alphaQCD = aqcd
+                           , alphaQED = aqed
+                           , signalProcessId = sid
+                           , barcode4SignalProcessVtx = bcd
+                           , numVtx = nvtx
+                           , barcodeBeam1 = bcdbm1
+                           , barcodeBeam2 = bcdbm2
+                           , randomStateList = (randomstnum,randomstlst)
+                           , weightList = (wgtnum,wgtlst) 
+                           }
 
-lineN :: Parser Text
-lineN = char 'N' *> takeWhile (not . isEndOfLine) <* endOfLine
-
-lineU :: Parser Text
-lineU = char 'U' *> takeWhile (not . isEndOfLine) <* endOfLine
+lineN :: Parser NamedWeight
+lineN = do char 'N' 
+           skipSpace
+           n <- decimal
+           skipSpace
+           strs <- replicateM n (skipSpace *> char '"' *> takeWhile (not . (== '"') ) <* char '"' )
+           skipWhile (not . isEndOfLine )
+           endOfLine 
+           return NamedWeight { numEntries = n, weightNames = strs }
+          
+ 
+lineU :: Parser MomentumPositionUnit
+lineU = do char 'U'
+           skipSpace
+           mom <- (try (string "GEV" >> return GeV) <|> (string "MEV" >> return MeV))
+           skipSpace
+           len <- (try (string "MM" >> return MM) <|> (string "CM" >> return CM))
+           skipWhile (not . isEndOfLine )
+           endOfLine 
+           return (MomentumPositionUnit mom len)
+--  *> takeWhile (not . isEndOfLine) <* endOfLine
 
 lineC :: Parser Text
 lineC = char 'C' *> takeWhile (not . isEndOfLine) <* endOfLine
@@ -71,9 +126,6 @@ lineP = char 'P' *> takeWhile (not . isEndOfLine) <* endOfLine
 
 
 
--- return "hepmc parser test IWKIM" 
-
-
 type Version = Text
 
 data EventBlock = EventBlock Version [ Event ]
@@ -84,15 +136,6 @@ data MomentumUnit = GeV | MeV
 data LengthUnit = MM | CM
                 deriving (Show)
 
-{- data Line = E GenEvent 
-          | N NamedWeight
-          | U MomentumPositionUnit
-          | C GenXSec
-          | H HeavyIon
-          | F PdfInfo
-          | V GenVertex
-          | P GenParticle
--}
 
 data Event = Event { genEventInfo :: GenEvent
                    , eventHeader :: EventHeader 

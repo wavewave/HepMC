@@ -1,4 +1,3 @@
-
 import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Class
@@ -37,10 +36,10 @@ main = do
         >-> takeWait 500 >-> counter 70 0 >-> (replicateM 3 printer >> forever (await >> return ())) -- printer
   return ()
 
-evp :: (Monad m) => PP.Parser Text m (Maybe (Either PA.ParsingError (Text, [Int])))
+evp :: (Monad m) => PP.Parser Text m (Maybe (Either PA.ParsingError (GenEvent,NamedWeight,MomentumPositionUnit,[Int])))
 evp = PA.parse event
 
-action :: (Monad m) => Producer Text m () -> Producer (Text, [Int]) m () 
+action :: (Monad m) => Producer Text m () -> Producer (GenEvent,NamedWeight,MomentumPositionUnit,[Int]) m () 
 action s = do
   (r,s') <- lift (runStateT evp s)
   case r of
@@ -57,10 +56,10 @@ counter m n = do
   counter m (n+1)
 
 
-printer :: (MonadIO m, Monad m, Show a) => Consumer a m () 
+printer :: (MonadIO m, Monad m, Show a, Show b, Show c) => Consumer (a,b,c,d) m () 
 printer = do
-  e <- await 
-  liftIO (print e)
+  (a,b,c,_) <- await 
+  liftIO (print (a,b,c))
 
 
 
