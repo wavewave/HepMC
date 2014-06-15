@@ -1,14 +1,18 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
 
 module HEP.Parser.HepMC where
 
 import Control.Applicative
 import Control.Monad (replicateM)
-import Data.Char (isSpace)
 import Data.Attoparsec.Text
-import Data.Text hiding (takeWhile, length)
+import Data.Char (isSpace)
+import Data.Maybe (isJust)
+import Data.Monoid
+import Data.Text hiding (takeWhile, length, map)
 -- 
 import Prelude hiding (takeWhile)
+import Debug.Trace
 
 hepmcHeader :: Parser Version
 hepmcHeader = do 
@@ -20,14 +24,30 @@ hepmcHeader = do
     return ver
 
   
-event :: Parser (GenEvent,NamedWeight,MomentumPositionUnit,[Int])
-event = do 
-    e <- lineE
-    n <- lineN
-    u <- lineU 
-    lineC >> lineF
-    ns <- many1 vertexParticles 
-    return (e,n,u,ns)
+event :: Parser GenEvent
+event = lineE <*> header (EventHeader Nothing Nothing Nothing Nothing Nothing)
+    -- n <- lineN
+    -- u <- lineU 
+    -- lineC >> lineF
+    -- ns <- many1 vertexParticles 
+    -- return e -- (e,n,u,ns)
+
+header :: EventHeader -> Parser EventHeader
+header h@EventHeader {..} = 
+    if isSaturated 
+      then return h
+      else try ( do s <- satisfy (inClass "NUCHF")
+                    trace (show s) $ do 
+                     case s of
+                      'N' -> lineN' >>= \r -> header (h { mWeightInfo = Just r })
+                      'U' -> lineU' >>= \r -> header (h { mUnitInfo = Just r })
+                      'C' -> lineC' >>= \r -> header (h { mXsecInfo = Just r })
+                      'H' -> lineH' >>= \r -> header (h { mHeavyIonInfo = Just r })
+                      'F' -> lineF' >>= \r -> header (h { mPdfInfo = Just r })
+                      _   -> return h
+               )
+           <|> return h                
+  where isSaturated = (getAll . mconcat . map All) [isJust mWeightInfo, isJust mUnitInfo, isJust mXsecInfo, isJust mHeavyIonInfo, isJust mPdfInfo]
 
 vertexParticles  :: Parser Int
 vertexParticles  = do 
@@ -42,7 +62,7 @@ hepmcVersion = string "HepMC::Version" >> skipSpace >> takeWhile (not . isSpace)
 blockStart :: Parser ()
 blockStart = string "HepMC::IO_GenEvent-START_EVENT_LISTING" >> return ()
 
-lineE :: Parser GenEvent
+lineE :: Parser (EventHeader -> GenEvent)
 lineE = do char 'E' 
            skipSpace 
            evnum <- decimal
@@ -70,65 +90,74 @@ lineE = do char 'E'
            randomstlst <- replicateM randomstnum decimal
            skipSpace
            wgtnum <- decimal
-           skipSpace
-           wgtlst <- replicateM wgtnum double 
+           wgtlst <- if wgtnum > 0 then skipSpace >> replicateM wgtnum double else return []
            -- skipSpace
            skipWhile (not . isEndOfLine )
            endOfLine
-           return GenEvent { eventNumber = evnum
-                           , numMultiparticleInteractions = nmint 
-                           , eventScale = esc
-                           , alphaQCD = aqcd
-                           , alphaQED = aqed
-                           , signalProcessId = sid
-                           , barcode4SignalProcessVtx = bcd
-                           , numVtx = nvtx
-                           , barcodeBeam1 = bcdbm1
-                           , barcodeBeam2 = bcdbm2
-                           , randomStateList = (randomstnum,randomstlst)
-                           , weightList = (wgtnum,wgtlst) 
-                           }
+           return (\h -> GenEvent { eventNumber = evnum
+                                  , numMultiparticleInteractions = nmint 
+                                  , eventScale = esc
+                                  , alphaQCD = aqcd
+                                  , alphaQED = aqed
+                                  , signalProcessId = sid
+                                  , barcode4SignalProcessVtx = bcd
+                                  , numVtx = nvtx
+                                  , barcodeBeam1 = bcdbm1
+                                  , barcodeBeam2 = bcdbm2
+                                  , randomStateList = (randomstnum,randomstlst)
+                                  , weightList = (wgtnum,wgtlst) 
+                                  , eventHeader = h
+                                  })
 
-lineN :: Parser NamedWeight
-lineN = do char 'N' 
-           skipSpace
-           n <- decimal
-           skipSpace
-           strs <- replicateM n (skipSpace *> char '"' *> takeWhile (not . (== '"') ) <* char '"' )
-           skipWhile (not . isEndOfLine )
-           endOfLine 
-           return NamedWeight { numEntries = n, weightNames = strs }
+-- | parser for named weight header line (without N)
+lineN' :: Parser NamedWeight
+lineN' = do -- char 'N' 
+            skipSpace
+            n <- decimal
+            skipSpace
+            strs <- replicateM n (skipSpace *> char '"' *> takeWhile (not . (== '"') ) <* char '"' )
+            skipWhile (not . isEndOfLine )
+            endOfLine 
+            return NamedWeight { numEntries = n, weightNames = strs }
           
+
  
-lineU :: Parser MomentumPositionUnit
-lineU = do char 'U'
-           skipSpace
-           mom <- (try (string "GEV" >> return GeV) <|> (string "MEV" >> return MeV))
-           skipSpace
-           len <- (try (string "MM" >> return MM) <|> (string "CM" >> return CM))
-           skipWhile (not . isEndOfLine )
-           endOfLine 
-           return (MomentumPositionUnit mom len)
---  *> takeWhile (not . isEndOfLine) <* endOfLine
+lineU' :: Parser MomentumPositionUnit
+lineU' = do -- char 'U'
+            skipSpace
+            mom <- (try (string "GEV" >> return GeV) <|> (string "MEV" >> return MeV))
+            skipSpace
+            len <- (try (string "MM" >> return MM) <|> (string "CM" >> return CM))
+            skipWhile (not . isEndOfLine )
+            endOfLine 
+            return (MomentumPositionUnit mom len)
 
-lineC :: Parser Text
-lineC = char 'C' *> takeWhile (not . isEndOfLine) <* endOfLine
+lineC' :: Parser Text
+lineC' = -- char 'C' *> 
+         takeWhile (not . isEndOfLine) <* endOfLine
 
-lineF :: Parser Text
-lineF = char 'F' *> takeWhile (not . isEndOfLine) <* endOfLine
+lineH' :: Parser Text
+lineH' = takeWhile (not . isEndOfLine) <* endOfLine
+
+
+lineF' :: Parser Text
+lineF' = -- char 'F' *> 
+         takeWhile (not . isEndOfLine) <* endOfLine
 
 lineV :: Parser Text
-lineV = char 'V' *> takeWhile (not . isEndOfLine) <* endOfLine
+lineV = char 'V' *> 
+         takeWhile (not . isEndOfLine) <* endOfLine
 
 lineP :: Parser Text
-lineP = char 'P' *> takeWhile (not . isEndOfLine) <* endOfLine
+lineP = char 'P' *> 
+         takeWhile (not . isEndOfLine) <* endOfLine
 
 
 
 
 type Version = Text
 
-data EventBlock = EventBlock Version [ Event ]
+-- data EventBlock = EventBlock Version [ Event ]
 
 data MomentumUnit = GeV | MeV 
                   deriving (Show)
@@ -137,11 +166,12 @@ data LengthUnit = MM | CM
                 deriving (Show)
 
 
-data Event = Event { genEventInfo :: GenEvent
+{- data Event = Event { genEventInfo :: GenEvent
                    , eventHeader :: EventHeader 
                    , vertices :: [GenVertex] 
                    }
            deriving Show
+-}
 
 data GenEvent = GenEvent { eventNumber :: Int
                          , numMultiparticleInteractions :: Int
@@ -155,14 +185,15 @@ data GenEvent = GenEvent { eventNumber :: Int
                          , barcodeBeam2 :: Int
                          , randomStateList :: (Int, [Int]) -- ^ (numEntries, randomStateIntergers)
                          , weightList :: (Int, [Double])  -- ^ (numEntries, weights )
+                         , eventHeader :: EventHeader  
                          }
               deriving (Show) 
 
-data EventHeader = EventHeader { weightInfo :: NamedWeight
-                               , unitInfo :: MomentumPositionUnit
-                               , xsecInfo :: Maybe GenXSec 
-                               , heavyIonInfo :: HeavyIon
-                               , pdfInfo :: PdfInfo
+data EventHeader = EventHeader { mWeightInfo   :: Maybe NamedWeight
+                               , mUnitInfo     :: Maybe MomentumPositionUnit
+                               , mXsecInfo     :: Maybe Text -- Maybe GenXSec 
+                               , mHeavyIonInfo :: Maybe Text -- Maybe HeavyIon
+                               , mPdfInfo      :: Maybe Text -- Maybe PdfInfo
                                }
                  deriving (Show)
             
