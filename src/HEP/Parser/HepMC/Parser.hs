@@ -28,11 +28,7 @@ hepmcHeader = do
   
 event :: Parser GenEvent
 event = lineE <*> header (EventHeader Nothing Nothing Nothing Nothing Nothing)
-    -- n <- lineN
-    -- u <- lineU 
-    -- lineC >> lineF
-    -- ns <- many1 vertexParticles 
-    -- return e -- (e,n,u,ns)
+  -- liftA2 lineE (header (EventHeader Nothing Nothing Nothing Nothing Nothing)) vertexParticles 
 
 header :: EventHeader -> Parser EventHeader
 header h@EventHeader {..} = 
@@ -113,8 +109,7 @@ lineE = do char 'E'
 
 -- | parser for named weight header line (without N)
 lineN' :: Parser NamedWeight
-lineN' = do -- char 'N' 
-            skipSpace
+lineN' = do skipSpace
             n <- decimal
             skipSpace
             strs <- replicateM n (skipSpace *> char '"' *> takeWhile (not . (== '"') ) <* char '"' )
@@ -125,8 +120,7 @@ lineN' = do -- char 'N'
 
  
 lineU' :: Parser MomentumPositionUnit
-lineU' = do -- char 'U'
-            skipSpace
+lineU' = do skipSpace
             mom <- (try (string "GEV" >> return GeV) <|> (string "MEV" >> return MeV))
             skipSpace
             len <- (try (string "MM" >> return MM) <|> (string "CM" >> return CM))
@@ -134,17 +128,70 @@ lineU' = do -- char 'U'
             endOfLine 
             return (MomentumPositionUnit mom len)
 
-lineC' :: Parser Text
-lineC' = -- char 'C' *> 
-         takeWhile (not . isEndOfLine) <* endOfLine
+lineC' :: Parser GenXSec
+lineC' = do skipSpace
+            xsec <- double
+            skipSpace
+            err <- double
+            skipWhile (not . isEndOfLine)
+            endOfLine
+            return (GenXSec xsec err)
 
-lineH' :: Parser Text
-lineH' = takeWhile (not . isEndOfLine) <* endOfLine
 
+lineH' :: Parser HeavyIon
+lineH' = do skipSpace
+            nhsc <- decimal <* skipSpace
+            npp <- decimal <* skipSpace
+            ntp <- decimal <* skipSpace
+            nnn <- decimal <* skipSpace
+            nsn <- decimal <* skipSpace
+            nsp <- decimal <* skipSpace
+            nnnw <- decimal <* skipSpace
+            nnwn <- decimal <* skipSpace
+            nnwnw <- decimal<* skipSpace
+            impct <- double <* skipSpace
+            aziangle <- double <* skipSpace
+            eccntrcty <- double <* skipSpace
+            inelstcxsec <- double 
+            skipWhile (not . isEndOfLine) >> endOfLine
+            return HeavyIon { numHardScattering         = nhsc
+                            , numProjectileParticipants = npp
+                            , numTargetParticipants     = ntp
+                            , numNNCollisions           = nnn
+                            , numSpectatorNeutrons      = nsn
+                            , numSpectatorProtons       = nsp
+                            , numNNwoundedCollisions    = nnnw
+                            , numNwoundedNCollisions    = nnwn
+                            , numNwoundedNwoundedCollisions = nnwnw
+                            , impactParamCollision      = impct
+                            , azimuthalAngleEventPlane  = aziangle
+                            , eccentricityParticipatingNucleonsInTPlane = eccntrcty
+                            , inelasticXsecNN           = inelstcxsec
+                            }
 
-lineF' :: Parser Text
-lineF' = -- char 'F' *> 
-         takeWhile (not . isEndOfLine) <* endOfLine
+lineF' :: Parser PdfInfo
+lineF' = do skipSpace
+            f1 <- decimal <* skipSpace
+            f2 <- decimal <* skipSpace
+            bx1 <- double <* skipSpace
+            bx2 <- double <* skipSpace
+            sqpdf <- double <* skipSpace
+            xfx1' <- double <* skipSpace
+            xfx2' <- double <* skipSpace
+            id1 <- signed decimal <* skipSpace
+            id2 <- signed decimal
+            skipWhile (not . isEndOfLine) >> endOfLine            
+            return PdfInfo { flavor1 = f1
+                           , flavor2 = f2
+                           , beamMomFrac1 = bx1
+                           , beamMomFrac2 = bx2
+                           , scaleQPDF = sqpdf
+                           , xfx1 = xfx1'
+                           , xfx2 = xfx2'
+                           , idLHAPDF1 = id1
+                           , idLHAPDF2 = id2 
+                           }
+
 
 lineV :: Parser Text
 lineV = char 'V' *> 

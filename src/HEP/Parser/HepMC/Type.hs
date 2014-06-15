@@ -12,14 +12,6 @@ data MomentumUnit = GeV | MeV
 data LengthUnit = MM | CM
                 deriving (Show)
 
-
-{- data Event = Event { genEventInfo :: GenEvent
-                   , eventHeader :: EventHeader 
-                   , vertices :: [GenVertex] 
-                   }
-           deriving Show
--}
-
 data GenEvent = GenEvent { eventNumber :: Int
                          , numMultiparticleInteractions :: Int
                          , eventScale :: Double
@@ -32,15 +24,16 @@ data GenEvent = GenEvent { eventNumber :: Int
                          , barcodeBeam2 :: Int
                          , randomStateList :: (Int, [Int]) -- ^ (numEntries, randomStateIntergers)
                          , weightList :: (Int, [Double])  -- ^ (numEntries, weights )
-                         , eventHeader :: EventHeader  
+                         , eventHeader :: EventHeader
+                         -- , vertices :: [GenVertex]
                          }
               deriving (Show) 
 
 data EventHeader = EventHeader { mWeightInfo   :: Maybe NamedWeight
                                , mUnitInfo     :: Maybe MomentumPositionUnit
-                               , mXsecInfo     :: Maybe Text -- Maybe GenXSec 
-                               , mHeavyIonInfo :: Maybe Text -- Maybe HeavyIon
-                               , mPdfInfo      :: Maybe Text -- Maybe PdfInfo
+                               , mXsecInfo     :: Maybe GenXSec 
+                               , mHeavyIonInfo :: Maybe HeavyIon
+                               , mPdfInfo      :: Maybe PdfInfo
                                }
                  deriving (Show)
             
