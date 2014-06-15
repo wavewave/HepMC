@@ -25,7 +25,7 @@ data GenEvent = GenEvent { eventNumber :: Int
                          , randomStateList :: (Int, [Int]) -- ^ (numEntries, randomStateIntergers)
                          , weightList :: (Int, [Double])  -- ^ (numEntries, weights )
                          , eventHeader :: EventHeader
-                         -- , vertices :: [GenVertex]
+                         , vertices :: [GenVertex]
                          }
               deriving (Show) 
 

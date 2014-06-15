@@ -27,16 +27,15 @@ hepmcHeader = do
 
   
 event :: Parser GenEvent
-event = lineE <*> header (EventHeader Nothing Nothing Nothing Nothing Nothing)
-  -- liftA2 lineE (header (EventHeader Nothing Nothing Nothing Nothing Nothing)) vertexParticles 
+event = lineE <*> (header (EventHeader Nothing Nothing Nothing Nothing Nothing)) <*> (many1 vertexParticles)
+
 
 header :: EventHeader -> Parser EventHeader
 header h@EventHeader {..} = 
     if isSaturated 
       then return h
       else try ( do s <- satisfy (inClass "NUCHF")
-                    trace (show s) $ do 
-                     case s of
+                    case s of
                       'N' -> lineN' >>= \r -> header (h { mWeightInfo = Just r })
                       'U' -> lineU' >>= \r -> header (h { mUnitInfo = Just r })
                       'C' -> lineC' >>= \r -> header (h { mXsecInfo = Just r })
@@ -47,11 +46,8 @@ header h@EventHeader {..} =
            <|> return h                
   where isSaturated = (getAll . mconcat . map All) [isJust mWeightInfo, isJust mUnitInfo, isJust mXsecInfo, isJust mHeavyIonInfo, isJust mPdfInfo]
 
-vertexParticles  :: Parser Int
-vertexParticles  = do 
-    lineV 
-    ps <- many1 lineP
-    return (length ps)
+vertexParticles  :: Parser GenVertex
+vertexParticles  = lineV <*> many1 lineP
 
     
 hepmcVersion :: Parser Version 
@@ -60,7 +56,7 @@ hepmcVersion = string "HepMC::Version" >> skipSpace >> takeWhile (not . isSpace)
 blockStart :: Parser ()
 blockStart = string "HepMC::IO_GenEvent-START_EVENT_LISTING" >> return ()
 
-lineE :: Parser (EventHeader -> GenEvent)
+lineE :: Parser (EventHeader -> [GenVertex] -> GenEvent)
 lineE = do char 'E' 
            skipSpace 
            evnum <- decimal
@@ -92,20 +88,21 @@ lineE = do char 'E'
            -- skipSpace
            skipWhile (not . isEndOfLine )
            endOfLine
-           return (\h -> GenEvent { eventNumber = evnum
-                                  , numMultiparticleInteractions = nmint 
-                                  , eventScale = esc
-                                  , alphaQCD = aqcd
-                                  , alphaQED = aqed
-                                  , signalProcessId = sid
-                                  , barcode4SignalProcessVtx = bcd
-                                  , numVtx = nvtx
-                                  , barcodeBeam1 = bcdbm1
-                                  , barcodeBeam2 = bcdbm2
-                                  , randomStateList = (randomstnum,randomstlst)
-                                  , weightList = (wgtnum,wgtlst) 
-                                  , eventHeader = h
-                                  })
+           return (\h vs -> GenEvent { eventNumber = evnum
+                                     , numMultiparticleInteractions = nmint 
+                                     , eventScale = esc
+                                     , alphaQCD = aqcd
+                                     , alphaQED = aqed
+                                     , signalProcessId = sid
+                                     , barcode4SignalProcessVtx = bcd
+                                     , numVtx = nvtx
+                                     , barcodeBeam1 = bcdbm1
+                                     , barcodeBeam2 = bcdbm2
+                                     , randomStateList = (randomstnum,randomstlst)
+                                     , weightList = (wgtnum,wgtlst) 
+                                     , eventHeader = h
+                                     , vertices = vs
+                                     })
 
 -- | parser for named weight header line (without N)
 lineN' :: Parser NamedWeight
@@ -192,14 +189,60 @@ lineF' = do skipSpace
                            , idLHAPDF2 = id2 
                            }
 
+lineV :: Parser ([GenParticle] -> GenVertex)
+lineV = do char 'V' >> skipSpace 
+           vbcd <- signed decimal <* skipSpace
+           vid' <- signed decimal <* skipSpace
+           vx' <- double <* skipSpace
+           vy' <- double <* skipSpace
+           vz' <- double <* skipSpace
+           vctau' <- double <* skipSpace
+           norphans <- decimal <* skipSpace
+           nouts <- decimal <* skipSpace
+           nwgts <- decimal
+           wgts <- if nwgts > 0 then replicateM nwgts (skipSpace *> double)  else return []
+           skipWhile (not . isEndOfLine) >> endOfLine
+           return (\ps -> GenVertex { vbarcode = vbcd
+                                    , vid      = vid' 
+                                    , vx       = vx'
+                                    , vy       = vy'
+                                    , vz       = vz'
+                                    , vctau    = vctau'
+                                    , numOrphanInPtl = norphans
+                                    , numOutPtl      = nouts
+                                    , vertexWeights = (nwgts, wgts)
+                                    , particles = ps })
 
-lineV :: Parser Text
-lineV = char 'V' *> 
-         takeWhile (not . isEndOfLine) <* endOfLine
 
-lineP :: Parser Text
-lineP = char 'P' *> 
-         takeWhile (not . isEndOfLine) <* endOfLine
+lineP :: Parser GenParticle
+lineP = do char 'P' >> skipSpace
+           pbcd <- decimal <* skipSpace
+           pid' <- signed decimal <* skipSpace
+           px' <- double <* skipSpace
+           py' <- double <* skipSpace
+           pz' <- double <* skipSpace
+           pE' <- double <* skipSpace
+           gmass <- double <* skipSpace
+           scode <- decimal <* skipSpace
+           polTh <- double <* skipSpace
+           polPh <- double <* skipSpace
+           vbcd <- signed decimal <* skipSpace
+           nflows <- decimal
+           flows' <- if nflows > 0 then replicateM nflows ((,) <$> (skipSpace *> signed decimal <* skipSpace) <*> signed decimal ) else return []
+           skipWhile (not . isEndOfLine) <* endOfLine
+           return GenParticle { pbarcode = pbcd
+                              , pidPDG = pid'
+                              , px = px'
+                              , py = py'
+                              , pz = pz'
+                              , pE = pE'
+                              , generatedMass = gmass
+                              , statusCode = scode
+                              , polTheta = polTh
+                              , polPhi = polPh
+                              , vbarcode4ThisIncoming = vbcd
+                              , flows = (nflows, flows')
+                              } 
 
 
 
