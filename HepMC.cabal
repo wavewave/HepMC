@@ -35,6 +35,9 @@ Library
                    base == 4.*,
                    pipes-attoparsec,
                    text
-  Exposed-Modules: HEP.Parser.HepMC
+  Exposed-Modules: 
+                   HEP.Parser.HepMC.Parser
+                   HEP.Parser.HepMC.Type
+
   Other-Modules: 
 

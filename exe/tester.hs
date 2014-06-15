@@ -11,10 +11,11 @@ import qualified Pipes.Prelude
 import qualified Pipes.Attoparsec as PA
 import qualified Pipes.Parse as PP
 import qualified Pipes.Text.IO as PIO
-import System.Environment
-import System.IO (withFile, IOMode(..),  stdout)
+import           System.Environment
+import           System.IO (withFile, IOMode(..),  stdout)
 -- 
-import HEP.Parser.HepMC
+import           HEP.Parser.HepMC.Parser
+import           HEP.Parser.HepMC.Type
 --
 
 takeWait :: (Monad m) => Int -> Pipe a a m ()
