@@ -11,50 +11,58 @@ import Data.Monoid
 import qualified Data.Text as T
 import System.Random.Mersenne
 --
+import HEP.Parser.LHCOAnalysis.PhysObj
+-- 
 import HEP.Parser.HepMC.Type 
 import HEP.Parser.HepMC.Builder
 
 
 p1 = GenParticle { pbarcode = 1
-                                                    , pidPDG = 2212
-                                                    , px = 0 
-                                                    , py = 0 
-                                                    , pz = 4.00e+03
-                                                    , pE = 4.00e+03
-                                                    , generatedMass = 0.0
-                                                    , statusCode = 3
-                                                    , polTheta = 0
-                                                    , polPhi = 0 
-                                                    , vbarcode4ThisIncoming = -1
-                                                    , flows = (0,[]) }
+                 , pidPDG = 2212
+                 , px = 0 
+                 , py = 0 
+                 , pz = 4.00e+03
+                 , pE = 4.00e+03
+                 , generatedMass = 0.0
+                 , statusCode = 3
+                 , polTheta = 0
+                 , polPhi = 0 
+                 , vbarcode4ThisIncoming = -1
+                 , flows = (0,[]) }
                                                     
-
-main = do
-    -- B.putStrLn $ toByteString (buildParticle p1)
-    -- B.putStrLn $ toByteString (buildVertex testvertex1)
-    -- B.putStrLn $ toByteString (buildHeader testheader)
-    let pt = 100
-    gen <- newMTGen Nothing
-    -- phi <- (2.0 * pi *) <$> random gen :: IO Double
-    
-    plst <- sequence (replicate 10000 (go gen pt))
+genElectron :: MTGen -> Double -> Double -> IO B.ByteString
+genElectron gen pt eta = do
+    -- phi <- (2.0 * pi *) <$> random gen :: IO Double    
+    plst <- sequence (replicate 10000 (go gen pt eta))
     let evts = zipWith testevent [1..] plst
-    B.putStrLn $ toByteString (buildHepMC evts)
-    -- print phi
+    return $ toByteString (buildHepMC evts)
 
-    -- B.putStrLn $ toByteString (buildEvent (testevent (3000,1500,220) ))
-
-go gen pt = do
+go gen pt eta = do
     phi <- (2.0 * pi *) <$> random gen :: IO Double
+    
     -- costh <- (\x -> x * 2.0 - 1.0 ) <$> random gen :: IO Double 
-    let costh = 0
+    let costh = etatocosth eta
     let sinth = sqrt (1 - costh*costh)
         pz = pt * costh / sinth
         px = pt * cos phi
         py = pt * sin phi
     return (px,py,pz)  
-   
-                         
+
+
+mkFilename :: Double -> Double -> FilePath
+mkFilename pt eta = "electron_" ++ show pt ++ "_" ++ show eta ++ ".hepmc"
+
+ptetaset = [ (pt,eta) | pt <- [ 10,20,30,40,50,60,70,80,90,100 ] ++ [150,200,250,300] , eta <- [-3.0,-2.5..3.0 ] ]
+ 
+work gen (pt,eta) = do
+    let filename = mkFilename pt eta 
+    B.writeFile filename =<< genElectron gen pt eta
+
+
+main = do 
+  gen <- newMTGen Nothing
+
+  mapM_  (work gen) ptetaset 
 
 testevent n (px,py,pz) = GenEvent { eventNumber = n 
                      , numMultiparticleInteractions = 1
