@@ -16,6 +16,7 @@ import HEP.Parser.HepMC.Type
 buildParticle :: GenParticle -> Builder
 buildParticle GenParticle {..} = fromText "P " 
                                  <> fromShow pbarcode <> space 
+                                 <> fromShow pidPDG <> space
                                  <> fromShow px <> space
                                  <> fromShow py <> space 
                                  <> fromShow pz <> space 
@@ -65,8 +66,7 @@ space = fromText " "
 newline = fromText "\n"
 
 buildEvent :: GenEvent -> Builder
-buildEvent GenEvent {..} = fromText "HepMC::Version 2.06.09\nHepMC::IO_GenEvent-START_EVENT_LISTING\n"
-                           <> fromText "E " 
+buildEvent GenEvent {..} =  fromText "E " 
                            <> fromShow eventNumber <> space
                            <> fromShow numMultiparticleInteractions <> space
                            <> fromShow eventScale <> space 
@@ -84,3 +84,9 @@ buildEvent GenEvent {..} = fromText "HepMC::Version 2.06.09\nHepMC::IO_GenEvent-
                            <> newline
                            <> buildHeader eventHeader
                            <> F.foldMap buildVertex vertices
+
+buildHepMC :: [GenEvent] -> Builder
+buildHepMC evts = fromText "HepMC::Version 2.06.09\nHepMC::IO_GenEvent-START_EVENT_LISTING\n" 
+                  <> F.foldMap buildEvent evts
+
+
