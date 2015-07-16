@@ -1,62 +1,68 @@
-import           Control.Monad
-import           Control.Monad.IO.Class
-import           Control.Monad.Trans.Class
+module Main where
+
+import           Control.Monad                    (forever, replicateM_, when)
 import           Control.Monad.Trans.State.Strict
--- import qualified Data.Attoparsec.Text             as A
-import           Data.Text
--- import qualified Data.Text.IO                     as TIO
--- import           Pipes (await, runEffect, yield, (>->))
+import           Data.Text                        (Text)
 import           Pipes
-import qualified Pipes.Attoparsec                 as PA
-import qualified Pipes.Parse                      as PP
-import qualified Pipes.Prelude
+import           Pipes.Attoparsec                 (ParsingError (..), parse)
+import           Pipes.Parse                      (Parser)
+import qualified Pipes.Prelude                    as P
 import qualified Pipes.Text.IO                    as PIO
-import           System.Environment
+import           System.Environment               (getArgs)
 import           System.IO                        (IOMode (..), withFile)
 --
 import           HEP.Parser.HepMC.Parser
 import           HEP.Parser.HepMC.Type
 --
 
-takeWait :: (Monad m) => Int -> Pipe a a m ()
-takeWait n = worker 0
-  where worker m
-          | m > n = await >> worker (m+1)
-          | otherwise = await >>= yield >> worker (m+1)
-
 main :: IO ()
 main = do
+  putStrLn "-- This is hepmc tester."
+  args <- getArgs
+  let infile = head args
+  putStrLn $ "---- The input file is " ++ show infile ++ "."
+  withFile infile ReadMode $ \hin ->
+    runEffect $ hepmcEvent hin >-> P.take 3 >-> P.print
+  putStrLn "---- Done."
+
+main' :: IO ()
+main' = do
   putStrLn "hepmc tester"
   args <- getArgs
-  let filename = args !! 0
-      p = PA.parse hepmcHeader
+  let filename = head args
+      p = parse hepmcHeader
   print filename
   withFile filename ReadMode $ \hin ->
     runEffect $ do
       (_, s) <- lift (runStateT p (PIO.fromHandle hin))
-      action s >-> Pipes.Prelude.tee (counter 100 0 >-> forever (await >> return ()))
-        >-> takeWait 500 >-> counter 70 0 >-> (replicateM 3 printer >> forever (await >> return ())) -- printer
-  return ()
+      action s
+      >-> P.tee (counter 100 0 >-> forever (void await))
+      >-> takeWait 500
+      >-> counter 70 0
+      >-> (replicateM_ 3 printer >> forever (void await)) -- printer
 
-evp :: (Monad m) => PP.Parser Text m (Maybe (Either PA.ParsingError GenEvent))
-evp = PA.parse event
+takeWait :: Monad m => Int -> Pipe a a m ()
+takeWait n = worker 0
+  where worker m | m > n     = await >> worker (m+1)
+                 | otherwise = await >>= yield >> worker (m+1)
 
-action :: (Monad m) => Producer Text m () -> Producer GenEvent m ()
+evp :: Monad m => Parser Text m (Maybe (Either ParsingError GenEvent))
+evp = parse event
+
+action :: Monad m => Producer Text m () -> Producer GenEvent m ()
 action s = do
-  (r,s') <- lift (runStateT evp s)
+  (r, s') <- lift (runStateT evp s)
   case r of
-    Nothing -> return ()
+    Nothing         -> return ()
     Just (Left _)   -> return ()
     Just (Right ev) -> yield ev >> action s'
 
 counter :: (MonadIO m, Monad m) => Int -> Int -> Pipe a a m ()
 counter m n = do
   e <- await
-  if n `mod` m == 0 then liftIO (print n) else return ()
+  when (n `mod` m == 0) $ (liftIO . print) n
   yield e
   counter m (n+1)
 
 printer :: (MonadIO m, Monad m, Show a) => Consumer a m ()
-printer = do
-  a <- await
-  liftIO (print a)
+printer = await >>= liftIO . print
