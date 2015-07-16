@@ -4,17 +4,31 @@
 module HEP.Parser.HepMC.Parser where
 
 import           Control.Applicative
-import           Control.Monad         (replicateM, void)
+import           Control.Monad                    (replicateM)
+import           Control.Monad.Trans.State.Strict
 import           Data.Attoparsec.Text
-import           Data.Char             (isSpace)
-import           Data.Maybe            (isJust)
-import           Data.Monoid           (All (..))
--- import Data.Text hiding (takeWhile, length, map)
+import           Data.Char                        (isSpace)
+import           Data.Maybe                       (isJust)
+import           Data.Monoid                      (All (..))
+import           Data.Text                        (Text)
+import           Pipes
+import qualified Pipes.Attoparsec                 as PA
+import           Pipes.Text.IO                    (fromHandle)
+import           System.IO                        (Handle)
 --
 import           HEP.Parser.HepMC.Type
 --
 -- import           Debug.Trace
-import           Prelude               hiding (takeWhile)
+import           Prelude                          hiding (takeWhile)
+
+hepmcEvent :: MonadIO m => Handle -> Producer GenEvent m ()
+hepmcEvent hin = (lift . evStr) hin >>= parseEvent
+  where evStr = execStateT (PA.parse hepmcHeader) . fromHandle
+
+parseEvent :: Monad m => Producer Text m () -> Producer GenEvent m ()
+parseEvent s = do (r, s') <- lift $ runStateT (PA.parse event) s
+                  case r of Just (Right ev) -> yield ev >> parseEvent s'
+                            _               -> return ()
 
 hepmcHeader :: Parser Version
 hepmcHeader = do skipSpace
@@ -25,7 +39,7 @@ hepmcHeader = do skipSpace
                  return ver
 
 event :: Parser GenEvent
-event =     lineE
+event = lineE
         <*> header (EventHeader Nothing Nothing Nothing Nothing Nothing)
         <*> many1 vertexParticles
 
