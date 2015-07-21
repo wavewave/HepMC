@@ -18,7 +18,6 @@ import           System.IO                        (Handle)
 --
 import           HEP.Parser.HepMC.Type
 --
--- import           Debug.Trace
 import           Prelude                          hiding (takeWhile)
 
 hepmcEvent :: MonadIO m => Handle -> Producer GenEvent m ()
@@ -49,11 +48,11 @@ header h@EventHeader {..} =
     then return h
     else do s <- satisfy (inClass "NUCHF")
             case s of
-              'N' -> lineN' >>= \r -> header (h { mWeightInfo = Just r })
-              'U' -> lineU' >>= \r -> header (h { mUnitInfo = Just r })
-              'C' -> lineC' >>= \r -> header (h { mXsecInfo = Just r })
-              'H' -> lineH' >>= \r -> header (h { mHeavyIonInfo = Just r })
-              'F' -> lineF' >>= \r -> header (h { mPdfInfo = Just r })
+              'N' -> lineN' >>= \r -> header (h { mWeightInfo    = Just r })
+              'U' -> lineU' >>= \r -> header (h { mUnitInfo      = Just r })
+              'C' -> lineC' >>= \r -> header (h { mXsecInfo      = Just r })
+              'H' -> lineH' >>= \r -> header (h { mHeavyIonInfo  = Just r })
+              'F' -> lineF' >>= \r -> header (h { mPdfInfo       = Just r })
               _   -> return h
          <|> return h
   where isSaturated = (getAll . mconcat . map All) [ isJust mWeightInfo
@@ -103,8 +102,7 @@ lineE = do char 'E'
            wgtlst <- if wgtnum > 0
                      then skipSpace >> replicateM wgtnum double
                      else return []
-           -- skipSpace
-           skipWhile (not . isEndOfLine )
+           skipWhile (not . isEndOfLine)
            endOfLine
            return (\h vs -> GenEvent { eventNumber                  = evnum
                                      , numMultiparticleInteractions = nmint
@@ -183,8 +181,8 @@ lineH' = do skipSpace
 
 lineF' :: Parser PdfInfo
 lineF' = do skipSpace
-            f1 <- decimal <* skipSpace
-            f2 <- decimal <* skipSpace
+            f1 <- signed decimal <* skipSpace
+            f2 <- signed decimal <* skipSpace
             bx1 <- double <* skipSpace
             bx2 <- double <* skipSpace
             sqpdf <- double <* skipSpace
